@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 from transcript.engine import Segment, TranscriptionResult
-from transcript.formatting import format_paragraphs, insert_sentence_boundaries
+from transcript.formatting import clean_segments, format_paragraphs, insert_sentence_boundaries
 
 
 def _format_srt_timestamp(seconds: float) -> str:
@@ -42,7 +42,8 @@ def build_json(result: TranscriptionResult, audio_file: str) -> str:
 
 
 def write_outputs(result: TranscriptionResult, audio_path: Path, transcripts_dir: Path) -> dict[str, Path]:
-    """audio_path のbasenameを継承し、transcripts_dir(直下に.txt/.srt, json/配下に.json)へ書き出す。"""
+    """audio_path のbasenameを継承し、transcripts_dir(直下に.txt/.srt, json/配下に.json)へ書き出す。
+    3形式とも同じクリーンアップ済みセグメント(幻覚の重複除去適用後)を使う。"""
     transcripts_dir.mkdir(parents=True, exist_ok=True)
     json_dir = transcripts_dir / "json"
     json_dir.mkdir(parents=True, exist_ok=True)
@@ -52,8 +53,13 @@ def write_outputs(result: TranscriptionResult, audio_path: Path, transcripts_dir
     srt_path = transcripts_dir / f"{base}.srt"
     json_path = json_dir / f"{base}.json"
 
-    txt_path.write_text(insert_sentence_boundaries(format_paragraphs(result.segments)), encoding="utf-8")
-    srt_path.write_text(build_srt(result.segments), encoding="utf-8")
-    json_path.write_text(build_json(result, audio_path.name), encoding="utf-8")
+    cleaned_segments = clean_segments(result.segments)
+    cleaned_result = TranscriptionResult(
+        segments=cleaned_segments, language=result.language, duration=result.duration
+    )
+
+    txt_path.write_text(insert_sentence_boundaries(format_paragraphs(cleaned_segments)), encoding="utf-8")
+    srt_path.write_text(build_srt(cleaned_segments), encoding="utf-8")
+    json_path.write_text(build_json(cleaned_result, audio_path.name), encoding="utf-8")
 
     return {"txt": txt_path, "srt": srt_path, "json": json_path}

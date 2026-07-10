@@ -4,7 +4,7 @@
 
 ## 現在のフェーズ
 
-**Phase 3: 品質チューニング — 完了 / Phase 4着手待ち**
+**Phase 4: 運用機能実装 — 完了 / Phase 5着手待ち**
 
 ## フェーズ状態
 
@@ -14,8 +14,29 @@
 | 1 | 完了 | エンジン確定(下記)。PoC実測込み |
 | 2 | 完了 | パイプライン骨格実装済み(下記)。clip_mid.mp3でend-to-end動作確認済み |
 | 3 | 完了 | golden set生成・句読点補完チューニング完了(下記、詳細は eval/EVAL.md) |
-| 4 | 未着手 | 運用機能 |
+| 4 | 完了 | 運用機能実装・python-reviewerレビュー対応完了(下記) |
 | 5 | 未着手 | 受け入れ検証 |
+
+## Phase 4 実施内容
+
+- `cli.py`: 進捗表示`[i/total]`追加、1ファイル失敗が全体を止めないtry/except(エラーは
+  握り潰さず表示+最後に再掲)、`find_stem_collisions()`で同名・別拡張子ファイル
+  (例: meeting.mp3とmeeting.wav)の出力衝突を事前検出し明示的エラーで停止
+- `transcribe.bat`: ドラッグ&ドロップ起動用ランチャー(日本語文字列はcmd.exeの
+  コードページ問題で文字化けしたため英語表記に変更)
+- `README.md`: セットアップ・使い方・出力形式・制約を記載
+
+### python-reviewerレビュー対応(2026-07-10)
+- [HIGH→対応済み] 同名・別拡張子ファイルの衝突でサイレントスキップされる問題
+  → `find_stem_collisions()`で事前検出しエラー停止に変更
+- [HIGH→対応済み] `deduplicate_repeats`/`collapse_intra_segment_repeats`が実装済みなのに
+  パイプラインから未呼び出しだった問題 → `formatting.clean_segments()`を追加し
+  `output.write_outputs()`から.txt/.srt/.json全てに適用するよう配線
+- [MEDIUM→対応済み] `_pause_marker`の冗長分岐を整理、`deduplicate_repeats`の未使用引数を削除
+- [LOW→対応済み] `_CONTINUATION_BLOCKLIST`の重複エントリ削除、エラーメッセージに例外型を追加、
+  `find_audio_files`に`is_file()`チェック追加
+- 回帰テスト: clip_mid.mp3で再テストし正常動作を確認。同名別拡張子ファイルでの
+  衝突検出も動作確認済み(サイレントスキップではなく明示エラーで停止)
 
 ## Phase 3 実施内容
 

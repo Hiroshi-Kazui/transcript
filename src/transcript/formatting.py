@@ -17,9 +17,9 @@ TERMINAL_PUNCTUATION = "。、,.!?」』"
 
 def _pause_marker(gap: float) -> str:
     """kotoba-whisperはほぼ句読点を出力しないため、セグメント間の無音ギャップの
-    長さから句読点を推定して補う(Phase 3の計測で有効性を確認済み)。"""
-    if gap >= PARAGRAPH_GAP_SECONDS:
-        return "。"
+    長さから句読点を推定して補う(Phase 3の計測で有効性を確認済み)。
+    PARAGRAPH_GAP_SECONDS以上のギャップはSENTENCE_GAP_SECONDS以上に包含されるため
+    分岐は2つで足りる。"""
     if gap >= SENTENCE_GAP_SECONDS:
         return "。"
     if gap >= COMMA_GAP_SECONDS:
@@ -52,8 +52,8 @@ def format_paragraphs(segments: list[Segment], gap_seconds: float = PARAGRAPH_GA
     return "\n\n".join("".join(p) for p in paragraphs)
 
 
-def deduplicate_repeats(segments: list[Segment], min_repeat_len: int = 6) -> list[Segment]:
-    """連続するセグメントが同一・ほぼ同一テキストの場合、幻覚とみなして1つに畳む。"""
+def deduplicate_repeats(segments: list[Segment]) -> list[Segment]:
+    """連続するセグメントが完全一致のテキストの場合、幻覚とみなして1つに畳む。"""
     if not segments:
         return []
 
@@ -77,6 +77,15 @@ def collapse_intra_segment_repeats(text: str, min_unit_len: int = 2, max_unit_le
     return text
 
 
+def clean_segments(segments: list[Segment]) -> list[Segment]:
+    """幻覚対策の重複除去をまとめて適用する。.txt/.srt/.json全出力の前段で呼ぶ。"""
+    segments = deduplicate_repeats(segments)
+    return [
+        Segment(start=s.start, end=s.end, text=collapse_intra_segment_repeats(s.text), avg_logprob=s.avg_logprob)
+        for s in segments
+    ]
+
+
 # セグメント境界の無音ギャップは連続発話中ほぼ0秒でシグナルにならない(Phase 3実測で確認)。
 # golden set(large-v3)側も同様に句読点をほぼ出力しないため、gap起因の句読点挿入だけでは
 # 段落末以外に句読点が付かない。文末表現の正規表現マッチで補う。
@@ -92,7 +101,7 @@ _SENTENCE_END_PATTERN = re.compile(
 # この直後に来る場合は文が続いているとみなし句点を打たない(逆接・並列・引用の接続表現)
 _CONTINUATION_BLOCKLIST = (
     "が", "けど", "けれども", "けれど", "し、", "ので", "から、", "そして",
-    "しかし", "でも", "また", "という", "けれど", "とき", "ながら",
+    "しかし", "でも", "また", "という", "とき", "ながら",
 )
 
 
