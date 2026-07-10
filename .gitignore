@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# uv
+.python-version
+
+# Audio / transcripts / golden set (contains real recording content — never commit)
+eval/golden/
+eval/samples/
+*.mp3
+*.wav
+*.m4a
+*.flac
+transcripts/
+
+# Models (downloaded at runtime)
+models/
+*.pt
+*.bin
+*.gguf
+
+# OS
+Thumbs.db
+.DS_Store

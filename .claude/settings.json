@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv:*)",
+      "Bash(ffmpeg:*)",
+      "Bash(ffprobe:*)",
+      "Bash(python:*)",
+      "Bash(py:*)",
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(ls:*)",
+      "PowerShell(ffmpeg:*)",
+      "PowerShell(ffprobe:*)",
+      "PowerShell(uv:*)"
+    ]
+  }
+}
