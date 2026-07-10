@@ -4,7 +4,7 @@
 
 ## 現在のフェーズ
 
-**Phase 1: 技術調査 — 完了 / Phase 2着手**
+**Phase 2: パイプライン骨格実装 — 完了 / Phase 3着手待ち**
 
 ## フェーズ状態
 
@@ -12,10 +12,25 @@
 |---|---|---|
 | 0 | 完了 | CLAUDE.md / .gitignore / PROGRESS.md / settings.json / commands(smoke,eval,acceptance) / eval/make_samples.py / eval/metrics.py 作成・commit済み(5ee8de0)。3分サンプル3クリップ(clip_intro/mid/noisy)生成済み(eval/samples/、git管理外) |
 | 1 | 完了 | エンジン確定(下記)。PoC実測込み |
-| 2 | 未着手 | パイプライン骨格 |
+| 2 | 完了 | パイプライン骨格実装済み(下記)。clip_mid.mp3でend-to-end動作確認済み |
 | 3 | 未着手 | 品質チューニング |
 | 4 | 未着手 | 運用機能 |
 | 5 | 未着手 | 受け入れ検証 |
+
+## Phase 2 実装内容
+
+- `pyproject.toml`: Python 3.12固定、faster-whisper依存、`transcribe`エントリポイント
+- `src/transcript/engine.py`: kotoba-whisper-v2.0-faster(int8/CPU)のロード・文字起こし。Phase 1確定パラメータ(vad_filter, condition_on_previous_text=False, compression_ratio_threshold=2.4, no_speech_threshold=0.6, avg_logprob<-1.0破棄)を実装
+- `src/transcript/formatting.py`: 無音ギャップ2秒で段落分け、連続セグメントの重複畳み込み、セグメント内反復の正規表現除去(幻覚対策の補助)
+- `src/transcript/output.py`: `.txt`(段落テキスト)/`.srt`(標準字幕形式)/`.json`(構造化、segments配列にstart/end/text/avg_logprob)を生成
+- `src/transcript/cli.py`: `transcribe <フォルダ>` エントリポイント。フォルダ内音声を走査し、`transcripts/`配下の3ファイル全存在チェックでスキップ判定
+
+## Phase 2 動作確認結果
+
+`eval/_smoke_out/`(一時テストフォルダ、cleanup済み)に`eval/samples/clip_mid.mp3`をコピーしてCLI実行:
+- 初回実行: 59.7秒で処理完了、`.txt`/`.srt`/`json/.json`の3ファイルとも正しい内容・構造で生成確認
+- 再実行: 「スキップ(処理済み)」が即座に表示され、モデル再ロードなしでスキップ動作を確認
+- 出力内容は品質面でも自然な日本語(Phase 1 PoCの結果と一致)
 
 ## Phase 1 決定事項: エンジン確定
 
