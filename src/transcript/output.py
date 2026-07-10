@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 from transcript.engine import Segment, TranscriptionResult
-from transcript.formatting import format_paragraphs
+from transcript.formatting import format_paragraphs, insert_sentence_boundaries
 
 
 def _format_srt_timestamp(seconds: float) -> str:
@@ -52,7 +52,7 @@ def write_outputs(result: TranscriptionResult, audio_path: Path, transcripts_dir
     srt_path = transcripts_dir / f"{base}.srt"
     json_path = json_dir / f"{base}.json"
 
-    txt_path.write_text(format_paragraphs(result.segments), encoding="utf-8")
+    txt_path.write_text(insert_sentence_boundaries(format_paragraphs(result.segments)), encoding="utf-8")
     srt_path.write_text(build_srt(result.segments), encoding="utf-8")
     json_path.write_text(build_json(result, audio_path.name), encoding="utf-8")
 

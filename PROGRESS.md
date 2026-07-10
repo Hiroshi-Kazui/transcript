@@ -4,7 +4,7 @@
 
 ## 現在のフェーズ
 
-**Phase 2: パイプライン骨格実装 — 完了 / Phase 3着手待ち**
+**Phase 3: 品質チューニング — 完了 / Phase 4着手待ち**
 
 ## フェーズ状態
 
@@ -13,9 +13,24 @@
 | 0 | 完了 | CLAUDE.md / .gitignore / PROGRESS.md / settings.json / commands(smoke,eval,acceptance) / eval/make_samples.py / eval/metrics.py 作成・commit済み(5ee8de0)。3分サンプル3クリップ(clip_intro/mid/noisy)生成済み(eval/samples/、git管理外) |
 | 1 | 完了 | エンジン確定(下記)。PoC実測込み |
 | 2 | 完了 | パイプライン骨格実装済み(下記)。clip_mid.mp3でend-to-end動作確認済み |
-| 3 | 未着手 | 品質チューニング |
+| 3 | 完了 | golden set生成・句読点補完チューニング完了(下記、詳細は eval/EVAL.md) |
 | 4 | 未着手 | 運用機能 |
 | 5 | 未着手 | 受け入れ検証 |
+
+## Phase 3 実施内容
+
+1. `eval/make_samples.py` のclip_intro位置を修正(59秒地点→736秒地点)。Phase 1 PoCで発覚した
+   「開幕の歌・アナウンス等の非発話区間を捉えていた」問題への対処。複数地点プローブの結果、
+   館内アナウンス区間(短い発話が点在)を新たなclip_introとして採用
+2. `eval/make_golden.py` を新規作成し、large-v3でgolden set生成(`eval/golden/*.txt`)
+3. `/smoke`→`/eval`ループで句読点補完ロジックを3段階チューニング(詳細はeval/EVAL.md参照):
+   - ギャップ長ベースの句読点(段落末のみ有効、セグメント間ギャップの99%が0秒と判明)
+   - 文末表現(です/ます/でした等)の正規表現検出を追加 → 可読性が大幅改善
+   - 否定形(ません/ませんでした)パターン追加で残存の未分割を解消
+4. golden set(large-v3)自体も句読点をほぼ出力しないため、句読点関連の変更はCERでの
+   正誤判定ができないと判明。CERの大幅悪化がないことを自動計測の合格基準とし、
+   可読性は目視で確認(CLAUDE.mdの「計測のみで判断」原則の例外としてEVAL.mdに明記)
+5. `src/transcript/formatting.py`: `insert_sentence_boundaries()` 追加、`output.py`から呼び出し
 
 ## Phase 2 実装内容
 
