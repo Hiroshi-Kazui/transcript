@@ -6,6 +6,7 @@
 import argparse
 import sys
 import time
+import traceback
 from collections import Counter
 from pathlib import Path
 
@@ -44,15 +45,16 @@ def is_already_processed(audio_path: Path, transcripts_dir: Path) -> bool:
 
 
 def process_folder(folder: Path) -> int:
-    """処理対象フォルダ内の音声を一括処理する。戻り値は失敗件数(0なら全件成功)。
+    """処理対象フォルダ内の音声を一括処理する。
+    戻り値: 0=全件成功, 正の数=失敗件数, -1=音声ファイルが1件も見つからなかった。
 
     1ファイルの失敗が全体を止めないよう、ファイル単位でエラーを捕捉して続行する。
     エラーは握りつぶさず、都度表示した上で最後にまとめて再掲する。
     """
     audio_files = find_audio_files(folder)
     if not audio_files:
-        print(f"音声ファイルが見つかりません: {folder}")
-        return 0
+        print(f"音声ファイルが見つかりません: {folder}", file=sys.stderr)
+        return -1
 
     collisions = find_stem_collisions(audio_files)
     if collisions:
@@ -70,20 +72,31 @@ def process_folder(folder: Path) -> int:
     for i, audio_path in enumerate(audio_files, start=1):
         progress = f"[{i}/{total}]"
         if is_already_processed(audio_path, transcripts_dir):
-            print(f"{progress} スキップ(処理済み): {audio_path.name}")
+            print(f"{progress} スキップ(処理済み): {audio_path.name}", flush=True)
             continue
 
-        print(f"{progress} 処理中: {audio_path.name}")
+        print(f"{progress} 処理中: {audio_path.name}", flush=True)
         t0 = time.time()
         try:
             result = transcribe_file(str(audio_path))
+
+            # セグメント0件は「無音ファイル」ではなく処理失敗の可能性が高い(VAD誤判定・
+            # デコード失敗・信頼度フィルタで全滅等)。出力を書かずに失敗扱いにすることで、
+            # 次回実行時に自動的に再試行される(is_already_processedがFalseのまま残る)。
+            if not result.segments and result.duration > 1.0:
+                raise RuntimeError(
+                    f"文字起こし結果が空でした(音声長 {result.duration:.1f}秒)。"
+                    "音声破損・フォーマット非対応・VAD誤判定の可能性があります。"
+                )
+
             outputs = write_outputs(result, audio_path, transcripts_dir)
         except Exception as e:
-            print(f"  エラー: {audio_path.name}: {type(e).__name__}: {e}", file=sys.stderr)
+            print(f"  エラー: {audio_path.name}: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+            traceback.print_exc(file=sys.stderr)
             failures.append((audio_path, f"{type(e).__name__}: {e}"))
             continue
         elapsed = time.time() - t0
-        print(f"  完了 ({elapsed:.1f}秒): {outputs['txt'].name}, {outputs['srt'].name}, {outputs['json'].relative_to(transcripts_dir)}")
+        print(f"  完了 ({elapsed:.1f}秒): {outputs['txt'].name}, {outputs['srt'].name}, {outputs['json'].relative_to(transcripts_dir)}", flush=True)
 
     if failures:
         print(f"\n{len(failures)}件のファイルで処理に失敗しました:", file=sys.stderr)
@@ -103,8 +116,10 @@ def main() -> int:
         print(f"エラー: フォルダが見つかりません: {folder}", file=sys.stderr)
         return 1
 
-    failure_count = process_folder(folder)
-    return 1 if failure_count else 0
+    result_code = process_folder(folder)
+    if result_code < 0:
+        return 2  # 音声ファイルが1件も見つからなかった
+    return 1 if result_code else 0
 
 
 if __name__ == "__main__":

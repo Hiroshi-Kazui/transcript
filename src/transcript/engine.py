@@ -26,6 +26,7 @@ class TranscriptionResult:
     segments: list[Segment] = field(default_factory=list)
     language: str = "ja"
     duration: float = 0.0
+    discarded_count: int = 0  # avg_logprob閾値・空テキストで破棄したセグメント数(監査用)
 
 
 _model_cache: dict[str, WhisperModel] = {}
@@ -50,14 +51,19 @@ def transcribe_file(audio_path: str, model_id: str = MODEL_ID) -> TranscriptionR
     )
 
     segments: list[Segment] = []
+    discarded_count = 0
     for seg in raw_segments:
         # avg_logprob が極端に低い(モデルが自信のない)セグメントは破棄する。
-        # Phase 1 PoC で確認した幻覚対策の定石の一つ。
+        # Phase 1 PoC で確認した幻覚対策の定石の一つ。破棄件数は監査用に記録する。
         if seg.avg_logprob < -1.0:
+            discarded_count += 1
             continue
         text = seg.text.strip()
         if not text:
+            discarded_count += 1
             continue
         segments.append(Segment(start=seg.start, end=seg.end, text=text, avg_logprob=seg.avg_logprob))
 
-    return TranscriptionResult(segments=segments, language=info.language, duration=info.duration)
+    return TranscriptionResult(
+        segments=segments, language=info.language, duration=info.duration, discarded_count=discarded_count
+    )

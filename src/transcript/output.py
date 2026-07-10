@@ -28,11 +28,16 @@ def build_srt(segments: list[Segment]) -> str:
     return "\n".join(lines)
 
 
-def build_json(result: TranscriptionResult, audio_file: str) -> str:
+def build_json(result: TranscriptionResult, audio_file: str, raw_segment_count: int) -> str:
     payload = {
         "audio_file": audio_file,
         "language": result.language,
         "duration": result.duration,
+        # 監査用メタデータ: 生セグメント数と、信頼度フィルタ・重複除去後の最終セグメント数の差分から
+        # どれだけ内容が破棄されたかを追跡できるようにする。
+        "raw_segment_count": raw_segment_count,
+        "discarded_low_confidence_count": result.discarded_count,
+        "final_segment_count": len(result.segments),
         "segments": [
             {"start": s.start, "end": s.end, "text": s.text, "avg_logprob": s.avg_logprob}
             for s in result.segments
@@ -53,13 +58,17 @@ def write_outputs(result: TranscriptionResult, audio_path: Path, transcripts_dir
     srt_path = transcripts_dir / f"{base}.srt"
     json_path = json_dir / f"{base}.json"
 
+    raw_segment_count = len(result.segments)
     cleaned_segments = clean_segments(result.segments)
     cleaned_result = TranscriptionResult(
-        segments=cleaned_segments, language=result.language, duration=result.duration
+        segments=cleaned_segments,
+        language=result.language,
+        duration=result.duration,
+        discarded_count=result.discarded_count,
     )
 
     txt_path.write_text(insert_sentence_boundaries(format_paragraphs(cleaned_segments)), encoding="utf-8")
     srt_path.write_text(build_srt(cleaned_segments), encoding="utf-8")
-    json_path.write_text(build_json(cleaned_result, audio_path.name), encoding="utf-8")
+    json_path.write_text(build_json(cleaned_result, audio_path.name, raw_segment_count), encoding="utf-8")
 
     return {"txt": txt_path, "srt": srt_path, "json": json_path}

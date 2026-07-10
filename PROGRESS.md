@@ -38,6 +38,24 @@
 - 回帰テスト: clip_mid.mp3で再テストし正常動作を確認。同名別拡張子ファイルでの
   衝突検出も動作確認済み(サイレントスキップではなく明示エラーで停止)
 
+### silent-failure-hunterレビュー対応(2026-07-10)
+- [HIGH→対応済み] セグメント0件の結果が「成功」扱いされ出力ファイルが作成され、
+  以後`is_already_processed`により永久にスキップされてしまう問題
+  → 音声長1秒超で0セグメントの場合は例外を発生させ失敗扱いにする(出力を書かず、
+  次回実行時に自動再試行される)よう`cli.py`を修正
+- [HIGH→対応済み] except節でトレースバックが失われ原因調査が困難な問題
+  → `traceback.print_exc(file=sys.stderr)`を追加
+- [MEDIUM→対応済み] 低信頼度セグメントの破棄件数・幻覚除去の削除件数が監査不能な問題
+  → `TranscriptionResult.discarded_count`を追加、JSON出力に
+  `raw_segment_count`/`discarded_low_confidence_count`/`final_segment_count`を含めて
+  可視化
+- [MEDIUM→対応済み] 進捗print()にflushがなくクラッシュ時にログが失われる可能性
+  → 進捗表示・エラー表示のprintに`flush=True`を追加
+- [LOW→対応済み] 音声ファイル0件の場合もexit code 0(成功)になっていた問題
+  → `process_folder`が-1を返す専用パスを設け、exit code 2を返すよう変更
+- [情報] ネイティブクラッシュ(ctranslate2内部のsegfault等)はPythonの例外処理では
+  捕捉不可能な既知の限界。flush対応により「最後に処理していたファイル」の特定は可能
+
 ## Phase 3 実施内容
 
 1. `eval/make_samples.py` のclip_intro位置を修正(59秒地点→736秒地点)。Phase 1 PoCで発覚した
