@@ -4,13 +4,13 @@
 
 ## 現在のフェーズ
 
-**Phase 0: ハーネス構築 — 実行中**
+**Phase 0: ハーネス構築 — 完了 / Phase 1着手待ち**
 
 ## フェーズ状態
 
 | Phase | 状態 | 備考 |
 |---|---|---|
-| 0 | 実行中 | CLAUDE.md / .gitignore / PROGRESS.md / ディレクトリ構造 作成済み。settings.json・コマンド・eval基盤はこれから |
+| 0 | 完了 | CLAUDE.md / .gitignore / PROGRESS.md / settings.json / commands(smoke,eval,acceptance) / eval/make_samples.py / eval/metrics.py 作成・commit済み(5ee8de0)。3分サンプル3クリップ(clip_intro/mid/noisy)生成済み(eval/samples/、git管理外) |
 | 1 | 未着手 | 技術調査(faster-whisper vs whisper.cpp Vulkan) |
 | 2 | 未着手 | パイプライン骨格 |
 | 3 | 未着手 | 品質チューニング |
@@ -19,10 +19,8 @@
 
 ## 次アクション
 
-1. `.claude/settings.json` で uv/ffmpeg/python 系コマンドを許可リスト化
-2. `.claude/commands/{smoke,eval,acceptance}.md` を作成
-3. `eval/make_samples.py`: 実録音(`G:\...\rec\260710_0915.mp3`)から3分クリップ3種を切り出し
-4. golden set 生成(large-v3で3クリップを文字起こしし参照テキストとする)— Phase 1でエンジンが入ってから実施
+1. Phase 1: サブエージェント並列調査(faster-whisper+kotoba-whisper系 / whisper.cpp Vulkan系 / 新技術有無)を時間制限付きで実施
+2. エンジン確定後、golden set 生成(large-v3で eval/samples/ の3クリップを文字起こしし eval/golden/*.txt として保存)
 
 ## ブロッカー・懸念事項
 
