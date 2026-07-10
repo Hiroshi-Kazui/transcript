@@ -22,6 +22,9 @@ models/
 *.bin
 *.gguf
 
+# PoC scratch (Phase 1 technical investigation, not part of the deliverable)
+eval/_poc/
+
 # OS
 Thumbs.db
 .DS_Store

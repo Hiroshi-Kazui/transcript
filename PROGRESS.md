@@ -4,23 +4,50 @@
 
 ## 現在のフェーズ
 
-**Phase 0: ハーネス構築 — 完了 / Phase 1着手待ち**
+**Phase 1: 技術調査 — 完了 / Phase 2着手**
 
 ## フェーズ状態
 
 | Phase | 状態 | 備考 |
 |---|---|---|
 | 0 | 完了 | CLAUDE.md / .gitignore / PROGRESS.md / settings.json / commands(smoke,eval,acceptance) / eval/make_samples.py / eval/metrics.py 作成・commit済み(5ee8de0)。3分サンプル3クリップ(clip_intro/mid/noisy)生成済み(eval/samples/、git管理外) |
-| 1 | 未着手 | 技術調査(faster-whisper vs whisper.cpp Vulkan) |
+| 1 | 完了 | エンジン確定(下記)。PoC実測込み |
 | 2 | 未着手 | パイプライン骨格 |
 | 3 | 未着手 | 品質チューニング |
 | 4 | 未着手 | 運用機能 |
 | 5 | 未着手 | 受け入れ検証 |
 
+## Phase 1 決定事項: エンジン確定
+
+**採用: faster-whisper (CPU) + kotoba-whisper-v2.0-faster のみ。whisper.cpp(Vulkan)は不採用。**
+
+### 確定した実装パラメータ
+- モデルID: `kotoba-tech/kotoba-whisper-v2.0-faster`(HuggingFace公式CTranslate2変換版、自前変換不要)
+- `compute_type="int8"`, `device="cpu"`
+- VADは faster-whisper **内蔵**の `vad_filter=True` を使う。外部silero-vadの別導入は不要(仕様書のVAD前処理はこれで満たせる)
+- 幻覚対策の既定値: `condition_on_previous_text=False` / `compression_ratio_threshold=2.4`(既定) / `no_speech_threshold=0.6`(既定) / `avg_logprob < -1.0` のセグメントは破棄
+- **Python 3.12固定**(3.13ではWindows向けCTranslate2のwheelが無く `pip install` が失敗する。uv venvを `--python 3.12` で明示作成する)
+
+### whisper.cpp(Vulkan)を不採用とした根拠(PoC実測、2026-07-10)
+実際の発話区間(clip_mid.mp3, 180秒)で公平比較を実施:
+
+| エンジン | 処理時間 | RTF | 品質 |
+|---|---|---|---|
+| faster-whisper (CPU int8) | 60.7秒 | 0.34 | 良好、文章として自然 |
+| whisper.cpp Vulkan (Intel Arc 140V GPU, q5_0量子化) | 25.0秒 | 0.14 | 誤認識が多い(「大会」を「対岩」「タイガル」と誤変換連発、文意が反転する誤りも1箇所) |
+
+速度は whisper.cpp が約2.4倍優位だが、品質はfaster-whisperが明確に優位。ユーザーは精度を優先し、faster-whisperのみ採用を選択(2026-07-10確認済み)。
+4時間の実データはfaster-whisper単体で約1.5時間の見込み(60.7s/180s × 14400s ≈ 4860s ≈ 81分)、受け入れ基準(一晩以内)を余裕を持って満たす。
+
+whisper.cppのPoC環境(Vulkan SDK, whisper.cpp build, GGML重み)は `eval/_poc/`(git管理外)に残置。将来速度が課題になった場合の再検証用に保持可能、不要なら削除してよい。
+
+### Phase 1で判明した副次的な問題(Phase 3で対応)
+`eval/make_samples.py` の `clip_intro`(録音開始から59秒地点, ratio=0.02)が、実際には開幕の歌・アナウンス等の非発話区間を捉えていたことが判明(VAD有効時は正しく11文字程度に抑制されたが、VAD無効での検証時に激しい幻覚が発生し発覚)。golden set作成時にclip_introの切り出し位置を発話が確実にある区間に調整するか、非発話サンプルとして意図的に残すか、Phase 3で判断する。
+
 ## 次アクション
 
-1. Phase 1: サブエージェント並列調査(faster-whisper+kotoba-whisper系 / whisper.cpp Vulkan系 / 新技術有無)を時間制限付きで実施
-2. エンジン確定後、golden set 生成(large-v3で eval/samples/ の3クリップを文字起こしし eval/golden/*.txt として保存)
+1. Phase 2: パイプライン骨格実装(音声→VAD→文字起こし→整形→.txt/.srt/.json出力)を3分サンプルで動作させる
+2. golden set 生成(large-v3で eval/samples/ の3クリップを文字起こしし eval/golden/*.txt として保存)— Phase 2実装後に実施
 
 ## ブロッカー・懸念事項
 
