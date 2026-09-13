@@ -27,6 +27,10 @@ on:
       folder:
         description: "pCloud上の音声フォルダ(未指定なら repo variable PCLOUD_FOLDER)"
         required: false
+      weekly:
+        description: "週次振り返りを強制生成する(通常は月曜JSTのみ)"
+        type: boolean
+        default: false
 
 jobs:
   transcribe:
@@ -89,17 +93,30 @@ jobs:
       - name: Install Claude Code
         run: npm install -g @anthropic-ai/claude-code
 
-      - name: Summarize with Claude (sonnet)
+      - name: Summarize with Claude (Fable)
         id: summarize
         continue-on-error: true # 要約失敗でも文字起こし結果は書き戻す
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: bash scripts/summarize.sh ./audio
 
+      - name: Weekly review with Claude (Fable, 月曜JSTのみ)
+        id: weekly
+        continue-on-error: true
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          FORCE_WEEKLY: ${{ github.event.inputs.weekly || 'false' }}
+        run: |
+          if [ "$FORCE_WEEKLY" != "true" ] && [ "$(TZ=Asia/Tokyo date +%u)" != "1" ]; then
+            echo "月曜(JST)ではないため週次振り返りをスキップ"
+            exit 0
+          fi
+          bash scripts/weekly.sh ./audio
+
       - name: Upload transcripts and summaries to pCloud
         # 各(サブ)フォルダ内の transcripts/ と summary.md を階層ごと書き戻す
-        run: rclone copy ./audio "pcloud:${PCLOUD_FOLDER}" --include "transcripts/**" --include "summary.md" --progress
+        run: rclone copy ./audio "pcloud:${PCLOUD_FOLDER}" --include "transcripts/**" --include "summary.md" --include "/weekly/**" --progress
 
       - name: Fail if transcription or summarization had errors
-        if: steps.run.outcome == 'failure' || steps.summarize.outcome == 'failure'
+        if: steps.run.outcome == 'failure' || steps.summarize.outcome == 'failure' || steps.weekly.outcome == 'failure'
         run: exit 1
