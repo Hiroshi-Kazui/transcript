@@ -65,12 +65,28 @@ jobs:
       - name: Transcribe
         id: run
         continue-on-error: true # 一部失敗でも成功分は書き戻す
-        run: uv run transcribe ./audio
+        # pCloud側は日付サブフォルダ(例: 20260913/)に音声が入る構成。
+        # CLIはフォルダ直下のみ走査するため、直下と各サブフォルダを順に処理する。
+        run: |
+          shopt -s nullglob
+          status=0
+          found=0
+          for d in ./audio ./audio/*/; do
+            files=("$d"/*.mp3 "$d"/*.wav "$d"/*.m4a "$d"/*.flac)
+            [ ${#files[@]} -gt 0 ] || continue
+            found=1
+            echo "=== $d ==="
+            uv run transcribe "$d" || status=1
+          done
+          if [ $found -eq 0 ]; then
+            echo "音声ファイルが見つかりません(サブフォルダ含む)" >&2
+            exit 2
+          fi
+          exit $status
 
       - name: Upload transcripts to pCloud
-        run: |
-          test -d ./audio/transcripts || { echo "transcripts/ が生成されていません" >&2; exit 1; }
-          rclone copy ./audio/transcripts "pcloud:${PCLOUD_FOLDER}/transcripts" --progress
+        # 各(サブ)フォルダ内の transcripts/ を階層ごと書き戻す
+        run: rclone copy ./audio "pcloud:${PCLOUD_FOLDER}" --include "transcripts/**" --progress
 
       - name: Fail if transcription had errors
         if: steps.run.outcome == 'failure'
