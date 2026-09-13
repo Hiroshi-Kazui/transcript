@@ -6,6 +6,8 @@
 #   2. 生成された rclone.conf を base64 化して repo secret に登録:
 #        base64 -w0 ~/.config/rclone/rclone.conf   (Windows: certutil -encode)
 #      → Settings > Secrets and variables > Actions > Secrets: RCLONE_CONF_B64
+#   2b. ローカルで `claude setup-token` を実行し、表示された OAuth トークンを
+#      Secrets: CLAUDE_CODE_OAUTH_TOKEN に登録(要約ステップがサブスクリプション枠で実行される)
 #   3. 対象フォルダ(リモート内パス)を repo variable に登録:
 #      → Variables: PCLOUD_FOLDER (例: REC_FILE/FOLDER01)
 #
@@ -84,10 +86,20 @@ jobs:
           fi
           exit $status
 
-      - name: Upload transcripts to pCloud
-        # 各(サブ)フォルダ内の transcripts/ を階層ごと書き戻す
-        run: rclone copy ./audio "pcloud:${PCLOUD_FOLDER}" --include "transcripts/**" --progress
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
 
-      - name: Fail if transcription had errors
-        if: steps.run.outcome == 'failure'
+      - name: Summarize with Claude (sonnet)
+        id: summarize
+        continue-on-error: true # 要約失敗でも文字起こし結果は書き戻す
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: bash scripts/summarize.sh ./audio
+
+      - name: Upload transcripts and summaries to pCloud
+        # 各(サブ)フォルダ内の transcripts/ と summary.md を階層ごと書き戻す
+        run: rclone copy ./audio "pcloud:${PCLOUD_FOLDER}" --include "transcripts/**" --include "summary.md" --progress
+
+      - name: Fail if transcription or summarization had errors
+        if: steps.run.outcome == 'failure' || steps.summarize.outcome == 'failure'
         run: exit 1
