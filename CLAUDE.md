@@ -6,9 +6,13 @@
 設計決定10項目(寿命/出力形式/処理場所/モデル/話者分離/構築プロセス/インターフェース/実行環境/テキスト整形/出力先)は
 このファイルを読んだうえで変更禁止。実装の自由度は仕様書に明記がない技術的細部のみ。
 
+改訂(2026-09-13、ユーザー決定): 設計決定のうち「処理場所」の完全ローカル制約は撤廃。
+GitHub Actions 等のクラウド実行と、pCloud との音声・出力の転送を許可する。
+
 ## 鉄則
 
-- 外部API送信ゼロ(音声もテキストも)。モデルの初回ダウンロード(HuggingFace)のみ許可
+- 外部送信は許可(2026-09-13 撤廃決定により旧鉄則「外部API送信ゼロ」を廃止)。
+  ただし転送先は pCloud・HuggingFace・GitHub に限る。第三者APIへの音声・テキスト送信を追加する場合はユーザー確認必須
 - 出力は `.txt` + `.srt` + `.json` の3形式必須
 - Python 依存追加は `uv add` のみ。素の `pip install` で環境を汚さない
 - 音声ファイル・golden set・出力物(transcripts/)はコミット禁止。.gitignore で強制
@@ -18,6 +22,8 @@
 
 ## 実行環境
 
-- Windows 11 / GPU: Intel Arc 140V(CUDAなし)/ Python 3.13 (uvが必要なら3.12にフォールバック)
+- ローカル: Windows 11 / GPU: Intel Arc 140V(CUDAなし)/ Python 3.13 (uvが必要なら3.12にフォールバック)
+- クラウド: GitHub Actions ubuntu-latest(`.github/workflows/transcribe.yml`)。pCloud とは rclone で転送
 - パッケージ管理: uv
-- 対象データ: `G:\マイドライブ\jw.org\集会・大会\地区大会\2026\大会プログラム\１日目\rec` の日本語講話MP3
+- 対象データ: `G:\マイドライブ\jw.org\集会・大会\地区大会\2026\大会プログラム\１日目\rec` の日本語講話MP3、
+  および pCloud 上の音声フォルダ(repo variable `PCLOUD_FOLDER`)

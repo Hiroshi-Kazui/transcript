@@ -1,0 +1,77 @@
+# pCloud 上の音声フォルダを定期的に文字起こしし、結果を pCloud に書き戻す。
+#
+# 事前設定(初回のみ):
+#   1. ローカルで `rclone config` を実行し、pCloud リモートを「pcloud」の名前で作成
+#      (OAuth 認証はブラウザで行われる)
+#   2. 生成された rclone.conf を base64 化して repo secret に登録:
+#        base64 -w0 ~/.config/rclone/rclone.conf   (Windows: certutil -encode)
+#      → Settings > Secrets and variables > Actions > Secrets: RCLONE_CONF_B64
+#   3. 対象フォルダ(リモート内パス)を repo variable に登録:
+#      → Variables: PCLOUD_FOLDER (例: REC_FILE/FOLDER01)
+#
+# 動作:
+#   - フォルダ全体(既存の transcripts/ 含む)をランナーに取得するため、
+#     処理済みファイルは CLI 側のスキップ判定がそのまま効く
+#   - 結果は pCloud 側の <フォルダ>/transcripts/ に書き戻される
+#   - モデル(約1.5GB)は actions/cache で2回目以降のダウンロードを回避
+
+name: transcribe
+
+on:
+  schedule:
+    - cron: "0 18 * * *" # 毎日 03:00 JST
+  workflow_dispatch:
+    inputs:
+      folder:
+        description: "pCloud上の音声フォルダ(未指定なら repo variable PCLOUD_FOLDER)"
+        required: false
+
+jobs:
+  transcribe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      PCLOUD_FOLDER: ${{ github.event.inputs.folder || vars.PCLOUD_FOLDER }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache HuggingFace model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-kotoba-whisper-v2.0-faster
+
+      - name: Install rclone
+        run: curl -fsSL https://rclone.org/install.sh | sudo bash
+
+      - name: Configure rclone
+        run: |
+          mkdir -p ~/.config/rclone
+          echo "${{ secrets.RCLONE_CONF_B64 }}" | base64 -d > ~/.config/rclone/rclone.conf
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Download audio from pCloud
+        run: |
+          test -n "$PCLOUD_FOLDER" || { echo "PCLOUD_FOLDER が未設定です" >&2; exit 1; }
+          rclone copy "pcloud:${PCLOUD_FOLDER}" ./audio --progress
+
+      - name: Transcribe
+        id: run
+        continue-on-error: true # 一部失敗でも成功分は書き戻す
+        run: uv run transcribe ./audio
+
+      - name: Upload transcripts to pCloud
+        run: |
+          test -d ./audio/transcripts || { echo "transcripts/ が生成されていません" >&2; exit 1; }
+          rclone copy ./audio/transcripts "pcloud:${PCLOUD_FOLDER}/transcripts" --progress
+
+      - name: Fail if transcription had errors
+        if: steps.run.outcome == 'failure'
+        run: exit 1
