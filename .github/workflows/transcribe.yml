@@ -85,8 +85,8 @@ jobs:
             uv run transcribe "$d" || status=1
           done
           if [ $found -eq 0 ]; then
-            echo "音声ファイルが見つかりません(サブフォルダ含む)" >&2
-            exit 2
+            echo "音声ファイルが見つかりません(サブフォルダ含む) — 処理対象なしとしてスキップ"
+            exit 0
           fi
           exit $status
 
