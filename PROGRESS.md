@@ -149,3 +149,16 @@ whisper.cppのPoC環境(Vulkan SDK, whisper.cpp build, GGML重み)は `eval/_poc
 - uv 0.11.7
 - Python 3.12 / 3.13 両方インストール済み(`py -0`で確認)
 - GPU: Intel Arc 140V、CUDAなし
+
+## 2026-09-20: ローカルPCでの定期実行を追加
+
+GitHub Actions と同じ処理(pCloud取得→文字起こし→日次要約→週次振り返り→pCloudへ書き戻し)を
+このPCで毎時 *:07 に実行する構成を追加。処理対象フォルダ・出力先は Actions と同一(pCloudの
+`My Records`)。
+
+- `scripts/run-local.sh` — ローカル版オーケストレータ。ロックディレクトリで排他し、
+  先行実行中の回はスキップする。音声ステージングとログは `%LOCALAPPDATA%\transcript\`
+- Windows タスクスケジューラ `transcript-local` — 毎時 *:07 起動、
+  MultipleInstances=IgnoreNew、ログオン中のみ動作
+- 未確認の懸念: Actions 側の定期実行は 9/14 以降 30〜40秒で「処理対象なし」終了しているが、
+  pCloud には未処理音声(20260920)が存在する。クラウド側の取得が機能していない可能性あり(未調査)

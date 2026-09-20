@@ -43,6 +43,32 @@ Windows向けwheelが提供されておらず、依存解決に失敗します�
 が生成されます。対応する3ファイルが既に存在するファイルは自動的にスキップされるため、
 処理を中断しても再実行すれば未処理分だけが処理されます。
 
+## このPCでの定期実行(毎時 *:07)
+
+pCloud 上の音声フォルダを取得 → 文字起こし → 日次要約(月曜は週次振り返りも)→ 結果を
+pCloud の同じ場所に書き戻す一連の処理を、このPCで毎時 7 分に実行します。処理対象フォルダと
+出力先は GitHub Actions の `transcribe` ワークフローと同一です。
+
+```bash
+# 手動実行(フォルダ省略時は "My Records")
+bash scripts/run-local.sh
+```
+
+- Windows タスクスケジューラのタスク名: `transcript-local`(毎時 *:07、PCの電源が入って
+  ログオンしている間だけ動作)
+- 前の実行がまだ走っている回は何もせずスキップします(スクリプト側のロックと、
+  タスク側の「既に実行中なら新しいインスタンスを開始しない」設定の二重化)
+- 音声の一時置き場とログ: `%LOCALAPPDATA%\transcript\`(`audio\`、`logs\<日付>.log`)
+- 前提: `rclone` に `pcloud` リモートが設定済み、`claude` CLI がログイン済み
+
+タスクの状態確認・停止:
+
+```powershell
+Get-ScheduledTask -TaskName transcript-local
+Get-ScheduledTaskInfo -TaskName transcript-local   # 次回・前回実行時刻
+Disable-ScheduledTask -TaskName transcript-local   # 一時停止
+```
+
 ## 品質チューニング(開発者向け)
 
 `eval/` 配下に品質計測用のハーネスがあります。詳細は `CLAUDE.md` および
