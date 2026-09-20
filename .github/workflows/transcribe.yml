@@ -20,8 +20,12 @@
 name: transcribe
 
 on:
-  schedule:
-    - cron: "0 18 * * *" # 毎日 03:00 JST
+  # 定期実行は 2026-09-20 にユーザー決定で停止。ローカルPCの毎時タスク
+  # (scripts/run-local.sh / タスク名 transcript-local)に処理を移したため。
+  # クラウドに戻す場合は下のコメントを解除し、Actions 側の無効化も解除する
+  # (gh workflow enable transcribe)。
+  # schedule:
+  #   - cron: "0 18 * * *" # 毎日 03:00 JST
   workflow_dispatch:
     inputs:
       folder:
